@@ -43,6 +43,9 @@ const SUIT_MAP: { [key: string]: Suit } = {
 };
 
 const styles = {
+  fileUpload: {
+    margin: '1rem 0',
+  },
   flashCards: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
@@ -77,35 +80,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Load both the card library and the CSV data
-    const loadData = async () => {
-      try {
-        // Load card library script
-        const script = document.createElement('script');
-        script.src = `${process.env.PUBLIC_URL}/elements.cardmeister.min.js`;
-        script.type = 'text/javascript';
-        script.async = true;
-        document.body.appendChild(script);
-
-        // Load CSV data using fetch
-        const response = await fetch(`${process.env.PUBLIC_URL}/cards.csv`);
-        const fileContent = await response.text();
-
-        const parsed = Papa.parse<CardData>(fileContent, {
-          header: true,
-          skipEmptyLines: true
-        });
-
-        if (parsed.data) {
-          setCardData(parsed.data);
-          // Draw first card after data is loaded
-          drawRandomCard(parsed.data);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-      }
-    };
-
-    loadData();
+    // Load card library script
+    const script = document.createElement('script');
+    script.src = `${process.env.PUBLIC_URL}/elements.cardmeister.min.js`;
+    script.type = 'text/javascript';
+    script.async = true;
+    document.body.appendChild(script);
 
     return () => {
       // Cleanup script
@@ -114,6 +94,24 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse<CardData>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.data) {
+          setCardData(results.data);
+          drawRandomCard(results.data);
+        }
+      },
+      error: (error) => {
+        console.error('Error parsing CSV:', error);
+      }
+    });
+  };
   const getRandomObjects = (correctObject: string, allData: CardData[], count: number): string[] => {
     const allObjects = allData.map(d => d.object).filter(obj => obj !== correctObject);
     const shuffled = [...allObjects].sort(() => Math.random() - 0.5);
@@ -155,23 +153,38 @@ const App: React.FC = () => {
   return (
     <div className="App">
       <h1>Flash Cards!</h1>
+      <div style={styles.fileUpload}>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
+          aria-label="Upload CSV file"
+        />
+      </div>
       <div style={styles.scoreDisplay}>Score: {score}</div>
-      <div id="card-container">
-        {currentCard && <PlayingCard rank={currentCard.rank} suit={currentCard.suit} />}
-      </div>
-      <div id="flash-cards" style={styles.flashCards}>
-        {answers.map((answer) => (
-          <div
-            key={answer}
-            style={styles.answerBox}
-            onClick={() => handleAnswerClick(answer)}
-          >
-            {answer}
+      {currentCard ? (
+        <>
+          <div id="card-container">
+            <PlayingCard rank={currentCard.rank} suit={currentCard.suit} />
           </div>
-        ))}
-      </div>
+          <div id="flash-cards" style={styles.flashCards}>
+            {answers.map((answer) => (
+              <div
+                key={answer}
+                style={styles.answerBox}
+                onClick={() => handleAnswerClick(answer)}
+              >
+                {answer}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p>Upload a CSV file to start playing!</p>
+      )}
     </div>
   );
+
 };
 
 export default App;
